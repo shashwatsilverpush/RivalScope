@@ -21,8 +21,7 @@ COPY package.json .
 # Railway mounts a persistent volume at /data — DB lives there
 ENV DB_PATH=/data/rivalscope.db
 ENV NODE_ENV=production
-ENV PORT=3001
 
-EXPOSE 3001
+EXPOSE 8080
 
 CMD ["node", "backend/index.js"]

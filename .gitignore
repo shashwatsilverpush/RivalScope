@@ -1,0 +1,19 @@
+# Environment variables (never commit these)
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# OS / editor
+.DS_Store
+*.swp
