@@ -47,7 +47,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__current_dir, '../frontend/dist', 'index.html'));
 });
 
-const PORT = parseInt(process.env.PORT) || 8080;
+const PORT = parseInt(process.env.SMTP_Server_Port) || 8080;
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
