@@ -104,6 +104,10 @@ Required:
 
 Optional SMTP fields (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) are only needed for scheduled email delivery.
 
+### Railway deployment
+
+Railway injects `PORT` as a string; `index.js` uses `parseInt(process.env.PORT, 10) || 8080` and binds to `0.0.0.0`. The frontend `dist/` is built during the Nixpacks build phase and served statically by Express whenever the folder exists (no `NODE_ENV` check needed). The SQLite DB is persisted at `/data/rivalscope.db` via a Railway volume.
+
 ### Scoring & weighting
 
 `frontend/src/lib/scoring.js` contains pure functions:
