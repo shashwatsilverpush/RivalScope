@@ -1,12 +1,9 @@
 [build]
-builder = "NIXPACKS"
-
-[phases.setup]
-nixPkgs = ["nodejs"]
-cmds = ["npm install && npm install --prefix frontend && npm install --prefix backend"]
-
-[phases.build]
-cmds = ["npm run build --prefix frontend"]
+builder = "DOCKERFILE"
 
 [deploy]
 startCommand = "node backend/index.js"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
