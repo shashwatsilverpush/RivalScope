@@ -32,3 +32,20 @@ app.listen(PORT, () => {
   console.log(`RivalScope running on http://localhost:${PORT}`);
   loadSchedules();
 });
+
+const path = require('path');
+const express = require('express');
+const app = express();
+
+// ... your existing API routes ...
+
+// Serve frontend static files
+app.use(express.static(path.join(__current_dir, '../frontend/dist')));
+
+// Handle SPA routing (important!)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__current_dir, '../frontend/dist', 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
