@@ -22,6 +22,8 @@ CRITICAL RULES:
 - NEVER hallucinate or assume features. A product only has a capability if it is explicitly stated in the search context provided. If you cannot find evidence of a feature in the search context, write exactly "Unconfirmed" — never invent a value.
 - NEVER leave a cell value empty or null. Every cell must contain a value. If unknown, write "Unconfirmed".
 - Use the column names EXACTLY as given in the COLUMN NAMES section. Do not substitute domain names or URLs.
+- The "columns" array MUST contain EXACTLY ["Field", product1, product2, ...]. NEVER include field/row names, scope names, or comparison categories as column headers — only product names belong after "Field".
+- Each row object key set MUST be exactly: {"Field": "...", product1: "...", product2: "..."}. NEVER use field names, row labels, or scope categories as object keys in rows — only "Field" and product names are valid keys.
 - Use ONLY the rows listed in REQUIRED ROWS. Do not add any extra rows beyond what is listed.
 - For each cell, be specific to the AdTech context.
 - The JSON must have exactly these fields:
@@ -224,11 +226,16 @@ Example format: ["Recent Product Announcements", "Key 2024 Launches", "Platform 
           ? scopeLower.replace(/compare|comparison/g, '').trim().slice(0, 60)
           : detectedCategory.replace(/_/g, ' ').toLowerCase();
       const scopeResults = await search(`${productName} ${searchSuffix}`);
+      // For custom/technical scopes run a second targeted search using the first resolved field
+      // as an additional keyword (e.g. "PubMatic skadnetwork mmp integration mobile")
+      const secondaryResults = isCustomScope && resolvedFields.length > 0
+        ? await search(`${productName} ${resolvedFields[0].toLowerCase().slice(0, 40)} ${searchSuffix.slice(0, 30)}`)
+        : [];
       const enrichmentResults = p.context?.key_facts
         ? (JSON.parse(p.context.key_facts).search_results || [])
         : [];
       const seen = new Set();
-      const combined = [...scopeResults, ...enrichmentResults].filter(r => {
+      const combined = [...scopeResults, ...secondaryResults, ...enrichmentResults].filter(r => {
         const key = r.url || r.title;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -407,6 +414,30 @@ Generate the competitor analysis JSON now.`;
       }
       return newRow;
     });
+
+    // Step 6b post-check: detect hybrid columns (LLM included field names as column headers alongside
+    // product names). If columns contains more entries than there are products + "Field", and some of
+    // those extra columns match known field names, strip non-product columns and rebuild rows.
+    const expectedProductCount = enriched.length;
+    const currentDataCols = (resultData.columns || []).slice(1);
+    const productOnlyCols = currentDataCols.filter(c => {
+      const cl = c.toLowerCase();
+      return enriched.some(p => {
+        const pid = p.identifier.toLowerCase();
+        const pname = (p.context?.resolved_name || '').toLowerCase();
+        return cl === pid || cl === pname || cl.includes(pid) || pid.includes(cl) ||
+               (pname && (cl.includes(pname) || pname.includes(cl)));
+      });
+    });
+    if (productOnlyCols.length === expectedProductCount && currentDataCols.length > expectedProductCount) {
+      console.warn('Step 6b: detected hybrid columns (field names mixed with product names) — stripping non-product columns');
+      resultData.columns = ['Field', ...productOnlyCols];
+      resultData.rows = (resultData.rows || []).map(row => {
+        const newRow = { Field: row.Field };
+        for (const col of productOnlyCols) newRow[col] = row[col] || 'Unconfirmed';
+        return newRow;
+      });
+    }
 
     // Step 6b post-check: if rows have only "Field" key (LLM omitted product values), fill with Unconfirmed
     const productColNames = (resultData.columns || []).slice(1);
