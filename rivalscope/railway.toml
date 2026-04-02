@@ -2,15 +2,12 @@
 builder = "NIXPACKS"
 
 [setup]
-# This installs root, frontend, and backend dependencies
 installationCommand = "npm install && npm install --prefix frontend && npm install --prefix backend"
 
 [phases.build]
-# This runs the vite build for your frontend
 dependsOn = ["setup"]
 buildCommand = "npm run build"
 
 [deploy]
-# This starts your node server
 startCommand = "node backend/index.js"
-healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"
