@@ -545,7 +545,12 @@ export default function NewAnalysis() {
           <ChatBubble
             key={msg.id}
             msg={msg}
-            onProductsChange={msg.meta?.showProducts ? (updated) => setProducts(updated) : undefined}
+            onProductsChange={msg.meta?.showProducts ? (updated) => {
+              setProducts(updated);
+              setMessages(prev => prev.map(m =>
+                m.id === msg.id ? { ...m, meta: { ...m.meta, products: updated } } : m
+              ));
+            } : undefined}
           />
         ))}
         <div ref={bottomRef} />
