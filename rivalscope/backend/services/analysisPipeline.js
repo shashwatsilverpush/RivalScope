@@ -215,9 +215,14 @@ Example format: ["Recent Product Announcements", "Key 2024 Launches", "Platform 
     for (const p of enriched) {
       // Build a search query that reflects the actual scope, not just the category
       const productName = p.context?.resolved_name || p.identifier;
-      const searchSuffix = scope
-        ? scope.toLowerCase().replace(/compare|comparison/g, '').trim().slice(0, 60)
-        : detectedCategory.replace(/_/g, ' ').toLowerCase();
+      const scopeLower = (scope || '').toLowerCase();
+      const wantsCompanyData = scopeLower.includes('company structure') ||
+        scopeLower.includes('headcount') || scopeLower.includes('founding');
+      const searchSuffix = wantsCompanyData
+        ? 'company founded employees headcount total funding raised headquarters crunchbase'
+        : scope
+          ? scopeLower.replace(/compare|comparison/g, '').trim().slice(0, 60)
+          : detectedCategory.replace(/_/g, ' ').toLowerCase();
       const scopeResults = await search(`${productName} ${searchSuffix}`);
       const enrichmentResults = p.context?.key_facts
         ? (JSON.parse(p.context.key_facts).search_results || [])
