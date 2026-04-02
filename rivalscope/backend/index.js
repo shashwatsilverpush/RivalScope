@@ -10,6 +10,16 @@ const app = express();
 // Use the standard PORT variable that Railway provides as an integer
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 
+// Example of how your Mail transporter should look now:
+const transporter = nodemailer.createTransport({
+  host: process.env.MAIL_HOST,
+  port: parseInt(process.env.MAIL_SERVER_CODE, 10), // This is now safe
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
+  },
+});
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
