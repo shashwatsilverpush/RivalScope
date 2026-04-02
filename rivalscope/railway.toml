@@ -1,13 +1,12 @@
 [build]
 builder = "NIXPACKS"
 
-[setup]
-installationCommand = "npm install && npm install --prefix frontend && npm install --prefix backend"
+[phases.setup]
+nixPkgs = ["nodejs"]
+cmds = ["npm install && npm install --prefix frontend && npm install --prefix backend"]
 
 [phases.build]
-dependsOn = ["setup"]
-buildCommand = "npm run build"
+cmds = ["npm run build --prefix frontend"]
 
 [deploy]
 startCommand = "node backend/index.js"
-restartPolicyType = "ON_FAILURE"
