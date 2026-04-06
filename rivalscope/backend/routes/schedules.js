@@ -5,6 +5,9 @@ const { reloadSchedules, scheduleJob } = require('../services/scheduler');
 const { run } = require('../services/analysisPipeline');
 const { compare } = require('../services/diffHighlighter');
 const { send } = require('../services/emailer');
+const { requireAuth } = require('../middleware/auth');
+
+router.use(requireAuth);
 
 router.get('/', (req, res) => {
   const db = getDb();

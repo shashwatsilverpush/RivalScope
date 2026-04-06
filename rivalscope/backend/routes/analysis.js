@@ -3,9 +3,10 @@ const router = express.Router();
 const { run } = require('../services/analysisPipeline');
 const { compare } = require('../services/diffHighlighter');
 const { getDb } = require('../db/database');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
 
 // POST /api/analysis/run — SSE streaming
-router.post('/run', async (req, res) => {
+router.post('/run', optionalAuth, async (req, res) => {
   const { title, products, scope, scopeWeights, referenceFormat, mode } = req.body;
 
   if (!products || products.length < 1) {
@@ -24,6 +25,7 @@ router.post('/run', async (req, res) => {
   try {
     await run({
       title, products, scope, scopeWeights, referenceFormat, mode,
+      userId: req.user?.id || null,
       onProgress: send,
     });
   } catch (err) {
@@ -34,11 +36,11 @@ router.post('/run', async (req, res) => {
 });
 
 // GET /api/analysis/history
-router.get('/history', (req, res) => {
+router.get('/history', requireAuth, (req, res) => {
   const db = getDb();
   const analyses = db.prepare(
-    `SELECT id, title, products_json, scope, detected_category, status, created_at, completed_at FROM analyses ORDER BY created_at DESC LIMIT 100`
-  ).all();
+    `SELECT id, title, scope, detected_category, products_json, status, created_at, completed_at FROM analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT 10`
+  ).all(req.user.id);
   res.json(analyses.map(a => ({ ...a, products: JSON.parse(a.products_json || '[]') })));
 });
 

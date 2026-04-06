@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { RefreshCw, Trash2, Search } from 'lucide-react';
 import api from '../lib/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const STATUS_BADGES = {
   done: 'bg-green-500/20 text-green-600 dark:text-green-400',
@@ -12,16 +13,22 @@ const STATUS_BADGES = {
 
 export default function History() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    if (user === undefined) return; // still loading auth
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     api.get('/analysis/history').then(({ data }) => {
       setAnalyses(data);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -38,6 +45,16 @@ export default function History() {
       a.detected_category?.toLowerCase().includes(q)
     );
   });
+
+  if (!loading && user === null) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-full gap-4 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">History</h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xs">Sign in to view your analysis history. Your last 10 analyses are saved per account.</p>
+        <Link to="/login" className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors">Sign In / Create Account</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

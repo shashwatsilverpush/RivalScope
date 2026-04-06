@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { runQA } = require('../services/qaAgent');
+const { requireAuth } = require('../middleware/auth');
+
+router.use(requireAuth);
 
 router.get('/run', async (req, res) => {
   try {

@@ -127,13 +127,13 @@ async function enrichProduct(identifier, forceRefresh = false) {
   return { ...existing, ...record };
 }
 
-async function run({ title, products, scope, scopeWeights, referenceFormat, mode = 'fast', onProgress }) {
+async function run({ title, products, scope, scopeWeights, referenceFormat, mode = 'fast', userId, onProgress }) {
   const db = getDb();
 
   // Create analysis record
   const insertResult = db.prepare(
-    `INSERT INTO analyses (title, scope, products_json, status) VALUES (?, ?, ?, 'running')`
-  ).run(title || `Analysis ${new Date().toLocaleDateString()}`, scope || '', JSON.stringify(products));
+    `INSERT INTO analyses (title, scope, products_json, status, user_id) VALUES (?, ?, ?, 'running', ?)`
+  ).run(title || `Analysis ${new Date().toLocaleDateString()}`, scope || '', JSON.stringify(products), userId || null);
   const analysisId = insertResult.lastInsertRowid;
 
   try {

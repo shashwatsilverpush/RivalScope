@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const { loadSchedules } = require('./services/scheduler');
@@ -9,11 +10,14 @@ const app = express();
 
 // Railway injects PORT as a string; parseInt ensures it's a valid integer
 const PORT = parseInt(process.env.PORT, 10) || 8080;
+if (!process.env.JWT_SECRET) console.warn('WARNING: JWT_SECRET is not set — auth will not work');
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 
 // API Routes
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/analysis', require('./routes/analysis'));
 app.use('/api/schedules', require('./routes/schedules'));
 app.use('/api/upload', require('./routes/upload'));

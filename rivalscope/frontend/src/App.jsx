@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import { BarChart3, PlusCircle, Clock, Calendar, Settings, Sun, Moon, FlaskConical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
+import { BarChart3, PlusCircle, Clock, Calendar, Settings, Sun, Moon, FlaskConical, ChevronLeft, ChevronRight, LogIn, LogOut } from 'lucide-react';
 import NewAnalysis from './pages/NewAnalysis.jsx';
 import Results from './pages/Results.jsx';
 import History from './pages/History.jsx';
 import Schedules from './pages/Schedules.jsx';
 import QA from './pages/QA.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
+import Login from './pages/Login.jsx';
+import { useAuth } from './context/AuthContext.jsx';
 
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const stored = localStorage.getItem('theme');
@@ -84,6 +87,21 @@ export default function App() {
           ))}
         </nav>
         <div className="p-2 border-t border-gray-200 dark:border-slate-800 space-y-1">
+          {!collapsed && (
+            user ? (
+              <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                <span className="flex-1 truncate text-gray-600 dark:text-slate-400 text-xs">{user.email}</span>
+                <button onClick={logout} title="Sign out" className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
+                <LogIn size={15} />
+                <span>Sign In</span>
+              </Link>
+            )
+          )}
           <button
             onClick={toggleTheme}
             title={collapsed ? (isDark ? 'Light Mode' : 'Dark Mode') : undefined}
@@ -106,11 +124,30 @@ export default function App() {
       {/* Main content */}
       <main className="flex-1 overflow-auto relative">
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route path="/" element={<NewAnalysis />} />
           <Route path="/results/:id" element={<Results />} />
           <Route path="/history" element={<History />} />
-          <Route path="/schedules" element={<Schedules />} />
-          <Route path="/qa" element={<QA />} />
+          <Route path="/schedules" element={
+            user === undefined ? null : user ? <Schedules /> : (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+                <div className="text-4xl">🔒</div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sign in to use Schedules</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xs">Create an account to schedule recurring analyses and get email reports.</p>
+                <Link to="/login" className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors">Sign In / Create Account</Link>
+              </div>
+            )
+          } />
+          <Route path="/qa" element={
+            user === undefined ? null : user ? <QA /> : (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+                <div className="text-4xl">🔒</div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sign in to run QA Tests</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xs">QA tests are available to signed-in users.</p>
+                <Link to="/login" className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors">Sign In / Create Account</Link>
+              </div>
+            )
+          } />
         </Routes>
       </main>
 
