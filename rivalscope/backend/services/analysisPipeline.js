@@ -1,9 +1,8 @@
 const { search } = require('./searchOrchestrator');
 const { classify, classifyAllRoles } = require('./productClassifier');
-const { FIELD_TEMPLATES, COMPANY_STRUCTURE_FIELDS } = require('./fieldTemplates');
+const { FIELD_TEMPLATES } = require('./fieldTemplates');
 const { analyzeWithStream, parseWithRetry, classifyWithFlash } = require('./llm');
 const { compare } = require('./diffHighlighter');
-const { getCompanyData } = require('./crunchbase');
 const { getDb } = require('../db/database');
 
 const SYSTEM_PROMPT = `You are a world-class AdTech industry analyst specializing in programmatic advertising, CTV/video ad tech, ad servers, DSPs, SSPs, DMPs, identity solutions, brand safety, consent management, and header bidding. You have deep knowledge of all major and emerging players in the AdTech ecosystem.
@@ -234,13 +233,9 @@ Example format: ["Recent Product Announcements", "Key 2024 Launches", "Platform 
       // Build a search query that reflects the actual scope, not just the category
       const productName = p.context?.resolved_name || p.identifier;
       const scopeLower = (scope || '').toLowerCase();
-      const wantsCompanyData = scopeLower.includes('company structure') ||
-        scopeLower.includes('headcount') || scopeLower.includes('founding');
-      const searchSuffix = wantsCompanyData
-        ? 'company founded employees headcount total funding raised headquarters crunchbase'
-        : scope
-          ? scopeLower.replace(/compare|comparison/g, '').trim().slice(0, 60)
-          : detectedCategory.replace(/_/g, ' ').toLowerCase();
+      const searchSuffix = scope
+        ? scopeLower.replace(/compare|comparison/g, '').trim().slice(0, 60)
+        : detectedCategory.replace(/_/g, ' ').toLowerCase();
       const scopeResults = await search(`${productName} ${searchSuffix}`);
       // For custom/technical scopes run a second targeted search using the first resolved field
       // as an additional keyword (e.g. "PubMatic skadnetwork mmp integration mobile")
@@ -260,31 +255,12 @@ Example format: ["Recent Product Announcements", "Key 2024 Launches", "Platform 
       productSearchResults.push({ ...p, searchResults: combined });
     }
 
-    // Step 3b: Fetch Crunchbase company data if Company Structure scope is selected
-    const wantsCompanyStructure = (scope || '').toLowerCase().includes('company structure') ||
-      (scope || '').toLowerCase().includes('headcount') ||
-      (scope || '').toLowerCase().includes('founding');
-    const crunchbaseData = {};
-    if (wantsCompanyStructure) {
-      const cbResults = await Promise.allSettled(
-        productSearchResults.map(p => getCompanyData(p.context?.resolved_name || p.identifier))
-      );
-      productSearchResults.forEach((p, i) => {
-        const result = cbResults[i];
-        if (result.status === 'fulfilled' && result.value) {
-          crunchbaseData[p.context?.resolved_name || p.identifier] = result.value;
-        }
-      });
-    }
-
     // Step 4: Build prompt
     const productContext = productSearchResults.map(p => {
       const role = p.role === 'main' ? '[MAIN PRODUCT]' : '[COMPETITOR]';
       const displayName = p.context?.resolved_name || p.identifier;
       const searchText = p.searchResults.slice(0, 6).map(r => `  - ${r.title}: ${r.description}`).join('\n');
-      const cb = crunchbaseData[displayName];
-      const cbText = cb ? `  [Crunchbase] Headcount: ${cb.headcount || 'N/A'} | Founded: ${cb.founded || 'N/A'} | Total Funding: ${cb.total_funding || 'N/A'} | Last Round: ${cb.last_round || 'N/A'} | HQ: ${cb.hq || 'N/A'}` : '';
-      return `${role} ${displayName}\n${searchText}${cbText ? '\n' + cbText : ''}`;
+      return `${role} ${displayName}\n${searchText}`;
     }).join('\n\n');
 
     const referenceInstruction = referenceFormat
@@ -292,28 +268,7 @@ Example format: ["Recent Product Announcements", "Key 2024 Launches", "Platform 
       : '';
 
     const columnNames = enriched.map(p => p.context?.resolved_name || p.identifier);
-    // Build company structure fields dynamically: only include fields where
-    // Crunchbase returned data for at least one product in this analysis.
-    // This avoids entire rows of "Unconfirmed" for unavailable data.
-    const CB_KEY_TO_FIELD = {
-      headcount:     'Company: Headcount',
-      founded:       'Company: Founded',
-      total_funding: 'Company: Total Funding Raised',
-      last_round:    'Company: Last Funding Round',
-      hq:            'Company: HQ Location',
-    };
-    const allCbValues = Object.values(crunchbaseData);
-    const dynamicCompanyFields = wantsCompanyStructure
-      ? Object.entries(CB_KEY_TO_FIELD)
-          .filter(([cbKey]) => allCbValues.length === 0 || allCbValues.some(d => d[cbKey] != null))
-          .map(([, fieldName]) => fieldName)
-      : [];
-    // Fallback: if Crunchbase returned nothing at all, keep the full template so the LLM still tries
-    const companyFields = dynamicCompanyFields.length > 0 ? dynamicCompanyFields : (wantsCompanyStructure ? COMPANY_STRUCTURE_FIELDS : []);
-
-    const allFields = wantsCompanyStructure
-      ? [...resolvedFields, ...companyFields]
-      : resolvedFields;
+    const allFields = resolvedFields;
 
     const userPrompt = `DETECTED CATEGORY: ${detectedCategory}
 
@@ -503,42 +458,6 @@ Generate the competitor analysis JSON now.`;
         }
         return cleaned;
       });
-    }
-
-    // Step 6e: Fill "Unconfirmed" Company Structure cells with Crunchbase data
-    if (wantsCompanyStructure && Object.keys(crunchbaseData).length > 0) {
-      const CB_FIELD_MAP = [
-        { keywords: ['headcount', 'employees', 'team size', 'company size', 'staff'], cbKey: 'headcount' },
-        { keywords: ['founded', 'founding year', 'year founded', 'established'], cbKey: 'founded' },
-        { keywords: ['total funding', 'funding raised', 'total raised', 'capital raised'], cbKey: 'total_funding' },
-        { keywords: ['last round', 'last funding', 'latest round', 'recent funding', 'funding stage'], cbKey: 'last_round' },
-        { keywords: ['headquarters', 'hq', 'location', 'office location', 'based in'], cbKey: 'hq' },
-      ];
-
-      resultData.rows = (resultData.rows || []).map(row => {
-        const fieldLower = (row.Field || '').toLowerCase();
-        const mapping = CB_FIELD_MAP.find(m => m.keywords.some(kw => fieldLower.includes(kw)));
-        if (!mapping) return row;
-
-        const newRow = { ...row };
-        for (const col of (resultData.columns || []).slice(1)) {
-          if ((newRow[col] || '').toLowerCase().includes('unconfirmed')) {
-            // Find Crunchbase data by matching column name to a product
-            const cbEntry = Object.entries(crunchbaseData).find(([name]) => {
-              const nl = name.toLowerCase();
-              const cl = col.toLowerCase();
-              return nl === cl || nl.includes(cl) || cl.includes(nl);
-            });
-            if (cbEntry && cbEntry[1][mapping.cbKey]) {
-              newRow[col] = cbEntry[1][mapping.cbKey];
-            }
-          }
-        }
-        return newRow;
-      });
-
-      // Attach raw crunchbase data to result for frontend use
-      resultData.company_data = crunchbaseData;
     }
 
     // Step 6c: Rename product keys in support_matrix to canonical names

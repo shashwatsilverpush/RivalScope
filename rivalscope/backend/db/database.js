@@ -23,6 +23,10 @@ function getDb() {
     // Migrations for columns added after initial schema
     try { db.exec('ALTER TABLE product_contexts ADD COLUMN known_roles TEXT'); } catch {}
     try { db.exec('ALTER TABLE analyses ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch (_) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"); } catch {}
+    try { db.exec('ALTER TABLE schedules ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+    try { db.exec('ALTER TABLE users ADD COLUMN reset_token TEXT'); } catch {}
+    try { db.exec('ALTER TABLE users ADD COLUMN reset_token_expires DATETIME'); } catch {}
   }
   return db;
 }

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Login() {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState('login');
+  const resetSuccess = searchParams.get('reset') === '1';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -73,6 +75,7 @@ export default function Login() {
               placeholder={tab === 'signup' ? 'Min. 8 characters' : '••••••••'}
             />
           </div>
+          {resetSuccess && <p className="text-sm text-green-600 dark:text-green-400">Password reset! Sign in below.</p>}
           {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
           <button
             type="submit"
@@ -83,8 +86,13 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="text-center">
-          <Link to="/" className="text-sm text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
+        <div className="text-center space-y-2">
+          {tab === 'login' && (
+            <Link to="/forgot-password" className="block text-sm text-sky-600 dark:text-sky-400 hover:underline">
+              Forgot password?
+            </Link>
+          )}
+          <Link to="/" className="block text-sm text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
             Continue without account →
           </Link>
         </div>

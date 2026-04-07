@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
-import { BarChart3, PlusCircle, Clock, Calendar, Settings, Sun, Moon, FlaskConical, ChevronLeft, ChevronRight, LogIn, LogOut, Database } from 'lucide-react';
+import { BarChart3, PlusCircle, Clock, Calendar, Settings, Sun, Moon, FlaskConical, ChevronLeft, ChevronRight, LogIn, LogOut, Users } from 'lucide-react';
 import NewAnalysis from './pages/NewAnalysis.jsx';
 import Results from './pages/Results.jsx';
 import History from './pages/History.jsx';
 import Schedules from './pages/Schedules.jsx';
 import QA from './pages/QA.jsx';
+import Admin from './pages/Admin.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import Login from './pages/Login.jsx';
-import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 
 export default function App() {
@@ -16,6 +18,8 @@ export default function App() {
   const [isDark, setIsDark] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuth();
+
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     const stored = localStorage.getItem('theme');
@@ -40,13 +44,21 @@ export default function App() {
     }
   };
 
-  const navItems = [
+  const userNavItems = [
     { to: '/', icon: PlusCircle, label: 'New Analysis', end: true },
     { to: '/history', icon: Clock, label: 'History' },
-    { to: '/enrich', icon: Database, label: 'Company Enrich' },
     { to: '/schedules', icon: Calendar, label: 'Schedules' },
+  ];
+
+  const adminNavItems = [
+    { to: '/', icon: PlusCircle, label: 'New Analysis', end: true },
+    { to: '/history', icon: Clock, label: 'History' },
+    { to: '/schedules', icon: Calendar, label: 'Schedules' },
+    { to: '/admin', icon: Users, label: 'Users' },
     { to: '/qa', icon: FlaskConical, label: 'QA Tests' },
   ];
+
+  const navItems = isAdmin ? adminNavItems : userNavItems;
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-slate-950">
@@ -92,7 +104,10 @@ export default function App() {
           {!collapsed && (
             user ? (
               <div className="flex items-center gap-2 px-3 py-2 text-sm">
-                <span className="flex-1 truncate text-gray-600 dark:text-slate-400 text-xs">{user.email}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-gray-600 dark:text-slate-400 text-xs">{user.email}</p>
+                  {isAdmin && <p className="text-[10px] text-sky-500 dark:text-sky-400 font-medium">Admin</p>}
+                </div>
                 <button onClick={logout} title="Sign out" className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
                   <LogOut size={15} />
                 </button>
@@ -127,10 +142,11 @@ export default function App() {
       <main className="flex-1 overflow-auto relative">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<NewAnalysis />} />
           <Route path="/results/:id" element={<Results />} />
           <Route path="/history" element={<History />} />
-          <Route path="/enrich" element={<CompanyEnrich />} />
           <Route path="/schedules" element={
             user === undefined ? null : user ? <Schedules /> : (
               <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
@@ -141,13 +157,19 @@ export default function App() {
               </div>
             )
           } />
-          <Route path="/qa" element={
-            user === undefined ? null : user ? <QA /> : (
+          <Route path="/admin" element={
+            user === undefined ? null : isAdmin ? <Admin /> : (
               <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
                 <div className="text-4xl">🔒</div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sign in to run QA Tests</h2>
-                <p className="text-sm text-gray-500 dark:text-slate-400 max-w-xs">QA tests are available to signed-in users.</p>
-                <Link to="/login" className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors">Sign In / Create Account</Link>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Admin access required</h2>
+              </div>
+            )
+          } />
+          <Route path="/qa" element={
+            user === undefined ? null : isAdmin ? <QA /> : (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+                <div className="text-4xl">🔒</div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Admin access required</h2>
               </div>
             )
           } />

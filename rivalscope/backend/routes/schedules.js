@@ -11,7 +11,7 @@ router.use(requireAuth);
 
 router.get('/', (req, res) => {
   const db = getDb();
-  const schedules = db.prepare('SELECT * FROM schedules ORDER BY created_at DESC').all();
+  const schedules = db.prepare('SELECT * FROM schedules WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
   res.json(schedules);
 });
 
@@ -22,8 +22,8 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   const result = db.prepare(
-    'INSERT INTO schedules (label, analysis_template_id, cron_expression, email_to) VALUES (?,?,?,?)'
-  ).run(label, analysis_template_id, cron_expression, email_to);
+    'INSERT INTO schedules (label, analysis_template_id, cron_expression, email_to, user_id) VALUES (?,?,?,?,?)'
+  ).run(label, analysis_template_id, cron_expression, email_to, req.user.id);
   const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(result.lastInsertRowid);
   scheduleJob(schedule);
 
