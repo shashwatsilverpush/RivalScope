@@ -167,7 +167,7 @@ export default function Results() {
               )}
               {activeTab === 'features' && (
                 <div className="p-3">
-                  <FeatureComparison data={result} />
+                  <FeatureComparison data={result} products={analysis.products} />
                 </div>
               )}
               {activeTab === 'support' && (

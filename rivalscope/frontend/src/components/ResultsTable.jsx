@@ -7,8 +7,6 @@ export default function ResultsTable({ data, products, diff }) {
 
   const { columns, rows } = data;
   const mainProducts = products?.filter(p => p.role === 'main').map(p => p.identifier) || [];
-
-  // Product columns are everything except "Field" (first column)
   const productCols = columns.slice(1);
 
   const toggleExpand = (key) => {
@@ -24,7 +22,11 @@ export default function ResultsTable({ data, products, diff }) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            {/* Product columns first */}
+            {/* Field column — sticky left */}
+            <th className="sticky top-0 left-0 z-30 px-3 py-2 text-left text-xs font-semibold border-b border-r-2 border-gray-200 dark:border-slate-700 whitespace-nowrap min-w-48 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
+              Field
+            </th>
+            {/* Product columns */}
             {productCols.map(col => (
               <th
                 key={col}
@@ -37,15 +39,15 @@ export default function ResultsTable({ data, products, diff }) {
                 {col}
               </th>
             ))}
-            {/* Field column last — sticky right */}
-            <th className="sticky top-0 right-0 z-30 px-3 py-2 text-left text-xs font-semibold border-b border-l-2 border-gray-200 dark:border-slate-700 whitespace-nowrap min-w-48 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
-              Field
-            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => (
             <tr key={rowIndex} className="border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50">
+              {/* Field name — sticky left */}
+              <td className="sticky left-0 px-3 py-2 bg-gray-50 dark:bg-slate-800 font-semibold text-xs z-10 border-r-2 border-gray-200 dark:border-slate-700 align-top">
+                <span className="uppercase tracking-wide text-[10px] font-semibold text-gray-500 dark:text-slate-400">{row.Field || ''}</span>
+              </td>
               {/* Product value cells */}
               {productCols.map((col, colIndex) => {
                 const cellKey = `${rowIndex}-${colIndex}`;
@@ -83,10 +85,6 @@ export default function ResultsTable({ data, products, diff }) {
                   </td>
                 );
               })}
-              {/* Field name cell — sticky right */}
-              <td className="sticky right-0 px-3 py-2 bg-gray-50 dark:bg-slate-800 font-semibold text-xs z-10 border-l-2 border-gray-200 dark:border-slate-700 align-top">
-                <span className="uppercase tracking-wide text-[10px] font-semibold text-gray-500 dark:text-slate-400">{row.Field || ''}</span>
-              </td>
             </tr>
           ))}
         </tbody>

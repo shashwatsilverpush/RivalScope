@@ -23,8 +23,7 @@ function classifyCell(value) {
 
 /**
  * Explode list-like fields into one row per capability item.
- * A field is "list-like" if at least one product has ≥2 comma-separated
- * values each ≤25 chars. "Unconfirmed" and empty cells are kept as-is.
+ * Non-list fields are SKIPPED entirely — they are descriptive text, not capabilities.
  */
 function buildCapabilityRows(rows, productNames) {
   const result = [];
@@ -42,31 +41,30 @@ function buildCapabilityRows(rows, productNames) {
       );
     });
 
-    if (isListField) {
-      // Collect unique items across all products (preserve insertion order)
-      const allItems = new Map(); // lowercase → display form
-      allValues.forEach(v => {
-        if (!v || v.toLowerCase().includes('unconfirmed')) return;
-        v.split(',').map(s => s.trim()).filter(Boolean).forEach(item => {
-          if (!allItems.has(item.toLowerCase())) allItems.set(item.toLowerCase(), item);
-        });
-      });
+    // Skip non-list rows — they're descriptive text, not binary capabilities
+    if (!isListField) continue;
 
-      for (const [lcItem, displayItem] of allItems) {
-        const capRow = { Field: displayItem, _fieldGroup: fieldName };
-        productNames.forEach(p => {
-          const cell = row[p] || '';
-          if (!cell || cell.toLowerCase().includes('unconfirmed')) {
-            capRow[p] = '';
-          } else {
-            const items = cell.split(',').map(s => s.trim().toLowerCase());
-            capRow[p] = items.includes(lcItem) ? displayItem : 'No';
-          }
-        });
-        result.push(capRow);
-      }
-    } else {
-      result.push(row);
+    // Collect unique items across all products (preserve insertion order)
+    const allItems = new Map(); // lowercase → display form
+    allValues.forEach(v => {
+      if (!v || v.toLowerCase().includes('unconfirmed')) return;
+      v.split(',').map(s => s.trim()).filter(Boolean).forEach(item => {
+        if (!allItems.has(item.toLowerCase())) allItems.set(item.toLowerCase(), item);
+      });
+    });
+
+    for (const [lcItem, displayItem] of allItems) {
+      const capRow = { Field: displayItem, _fieldGroup: fieldName };
+      productNames.forEach(p => {
+        const cell = row[p] || '';
+        if (!cell || cell.toLowerCase().includes('unconfirmed')) {
+          capRow[p] = '';
+        } else {
+          const items = cell.split(',').map(s => s.trim().toLowerCase());
+          capRow[p] = items.includes(lcItem) ? displayItem : 'No';
+        }
+      });
+      result.push(capRow);
     }
   }
 
@@ -80,12 +78,25 @@ export default function SupportMatrix({ data }) {
 
   const productNames = data.columns.slice(1);
 
-  // Use LLM-generated support_matrix if available, else build from rows
   const rawRows = data.support_matrix?.length > 0
     ? data.support_matrix.map(e => ({ Field: e.capability, ...e }))
     : data.rows;
 
   const rows = buildCapabilityRows(rawRows, productNames);
+
+  // Empty state — no list-like rows found
+  if (rows.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          No feature-level capability data to compare for this analysis.
+        </p>
+        <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+          Switch to the <strong>Feature Comparison</strong> tab for a full view.
+        </p>
+      </div>
+    );
+  }
 
   // Track field group separators
   let lastGroup = null;
@@ -95,7 +106,11 @@ export default function SupportMatrix({ data }) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            {/* Product columns first */}
+            {/* Capability column — sticky left */}
+            <th className="sticky top-0 left-0 z-30 px-3 py-2 text-left text-xs font-semibold border-b border-r-2 border-gray-200 dark:border-slate-700 min-w-44 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 whitespace-nowrap">
+              Capability
+            </th>
+            {/* Product columns */}
             {productNames.map(name => (
               <th
                 key={name}
@@ -104,10 +119,6 @@ export default function SupportMatrix({ data }) {
                 {name}
               </th>
             ))}
-            {/* Capability column — sticky right */}
-            <th className="sticky top-0 right-0 z-20 px-3 py-2 text-left text-xs font-semibold border-b border-l-2 border-gray-200 dark:border-slate-700 min-w-44 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 whitespace-nowrap">
-              Capability
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -128,6 +139,11 @@ export default function SupportMatrix({ data }) {
                   </tr>
                 )}
                 <tr className="border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                  {/* Capability name — sticky left */}
+                  <td className="sticky left-0 px-3 py-2 bg-white dark:bg-slate-900 border-r-2 border-gray-200 dark:border-slate-700 text-xs font-medium text-gray-700 dark:text-slate-300 z-10">
+                    {row.Field}
+                  </td>
+                  {/* Product icon cells */}
                   {productNames.map(name => {
                     const rawValue = row[name] || '';
                     const status = data.support_matrix?.length > 0
@@ -145,7 +161,6 @@ export default function SupportMatrix({ data }) {
                           >
                             {icon.symbol}
                           </button>
-                          {/* Hover tooltip */}
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 pointer-events-none">
                             <div className="bg-gray-900 dark:bg-slate-700 text-white text-xs rounded-lg px-3 py-2 shadow-lg w-52 text-left">
                               <p className={`font-semibold mb-1 ${
@@ -161,10 +176,6 @@ export default function SupportMatrix({ data }) {
                       </td>
                     );
                   })}
-                  {/* Capability name — sticky right */}
-                  <td className="sticky right-0 px-3 py-2 bg-white dark:bg-slate-900 border-l-2 border-gray-200 dark:border-slate-700 text-xs font-medium text-gray-700 dark:text-slate-300 z-10">
-                    {row.Field}
-                  </td>
                 </tr>
               </React.Fragment>
             );
@@ -175,7 +186,7 @@ export default function SupportMatrix({ data }) {
       {tooltip && (
         <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs text-gray-700 dark:text-slate-300 max-w-xl">
           <p className="font-semibold text-gray-900 dark:text-white mb-1">{tooltip.field} — {tooltip.colName}</p>
-          <p className="leading-relaxed">{tooltip.value || <span className="italic text-gray-400">No data</span>}</p>
+          <p className="leading-relaxed">{tooltip.value}</p>
         </div>
       )}
 
