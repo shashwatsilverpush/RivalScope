@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
-import { BarChart3, PlusCircle, Clock, Calendar, Settings, Sun, Moon, FlaskConical, ChevronLeft, ChevronRight, LogIn, LogOut } from 'lucide-react';
+import { BarChart3, PlusCircle, Clock, Calendar, Settings, Sun, Moon, FlaskConical, ChevronLeft, ChevronRight, LogIn, LogOut, Database } from 'lucide-react';
 import NewAnalysis from './pages/NewAnalysis.jsx';
 import Results from './pages/Results.jsx';
 import History from './pages/History.jsx';
@@ -8,6 +8,7 @@ import Schedules from './pages/Schedules.jsx';
 import QA from './pages/QA.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import Login from './pages/Login.jsx';
+import CompanyEnrich from './pages/CompanyEnrich.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
   const navItems = [
     { to: '/', icon: PlusCircle, label: 'New Analysis', end: true },
     { to: '/history', icon: Clock, label: 'History' },
+    { to: '/enrich', icon: Database, label: 'Company Enrich' },
     { to: '/schedules', icon: Calendar, label: 'Schedules' },
     { to: '/qa', icon: FlaskConical, label: 'QA Tests' },
   ];
@@ -128,6 +130,7 @@ export default function App() {
           <Route path="/" element={<NewAnalysis />} />
           <Route path="/results/:id" element={<Results />} />
           <Route path="/history" element={<History />} />
+          <Route path="/enrich" element={<CompanyEnrich />} />
           <Route path="/schedules" element={
             user === undefined ? null : user ? <Schedules /> : (
               <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
