@@ -31,6 +31,7 @@ CRITICAL RULES:
     "category": "<detected adtech category>",
     "columns": ["Field", "<Product1>", "<Product2>"],
     "rows": [ {"Field": "...", "<Product1>": "...", "<Product2>": "..."} ],
+    "support_matrix": [ {"capability": "<specific feature name>", "<Product1>": "yes|no|partial", "<Product2>": "yes|no|partial"} ],
     "summary": "<2-3 sentence executive summary with specific insights>",
     "data_confidence": "<high|medium|low>",
     "generated_at": "<ISO timestamp>"
@@ -39,10 +40,25 @@ CRITICAL RULES:
   {"Field": "Pricing", "Magnite": "CPM-based", "PubMatic": "Not publicly disclosed", "The Trade Desk": "CPM-based"}
   A row with ONLY a "Field" key and no product values is INVALID and will be rejected.
 
+SUPPORT MATRIX RULES (critical — follow exactly):
+- The "support_matrix" array must contain 15–25 entries covering the most important concrete capabilities for this category.
+- Each entry represents ONE specific, named feature or capability — not a category heading.
+  GOOD examples: "UID2 Support", "Prebid.js Integration", "CTV Inventory", "Lookalike Modeling", "GDPR Compliance", "Open Auction", "Self-serve Dashboard", "Cross-device Graph", "Dynamic Creative", "Real-time Reporting"
+  BAD examples: "Audience Targeting" (too broad), "Integrations" (vague), "Privacy" (category heading), "Features" (meaningless)
+- Derive the capabilities from what the products actually support based on the search context and your rows.
+  Pull concrete named features from rows like "Inventory Types", "Deal Types", "Identity Solutions", "Attribution Models", etc.
+- Each product value MUST be exactly one of: "yes", "no", "partial"
+  - "yes" = product clearly supports this feature
+  - "partial" = product has limited/emerging support
+  - "no" = product explicitly does not support this, or strong evidence it is absent
+  - Use "no" when one product clearly has a feature and another clearly does not.
+  - Do NOT default everything to "yes" — differentiation is the point.
+- Group related capabilities logically (inventory types together, deal types together, etc.)
+
 CONCISENESS RULES (strictly follow to reduce generation time):
-- Each cell value: maximum 15 words
+- Each cell value in "rows": maximum 15 words
 - Use standard AdTech abbreviations (VAST, VPAID, RTB, CTV, PMP, etc.)
-- Lists: comma-separated values only, no full sentences
+- Lists in rows: comma-separated values only, no full sentences
 - Unknown pricing: write exactly "Not publicly disclosed"
 - Unconfirmed feature: write exactly "Unconfirmed"
 - No explanatory preamble in cell values`;

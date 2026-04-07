@@ -7,69 +7,66 @@ const ICONS = {
   unknown: { symbol: '?', label: 'Unconfirmed',      classes: 'text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800' },
 };
 
-const NEGATIVE_PHRASES  = ['not supported', 'not available', 'unavailable', 'n/a', 'none', 'not offered'];
-const UNKNOWN_PHRASES   = ['unconfirmed', 'not publicly disclosed', 'unknown'];
+// ─── Fallback parser for older analyses that lack support_matrix ──────────────
+const QUALIFIER_STARTS = [
+  'and ', 'or ', 'but ', 'strong', 'focus', 'focused', 'broad', 'primarily',
+  'image-heavy', 'mainly', 'especially', 'particularly', 'known for',
+  'emerging', 'limited ', 'expanding', 'across ',
+];
 
-function classifyCell(value) {
-  if (!value || typeof value !== 'string') return 'unknown';
-  const v = value.trim();
-  if (!v) return 'unknown';
-  const lower = v.toLowerCase();
-  if (UNKNOWN_PHRASES.some(p => lower.includes(p))) return 'unknown';
-  if (lower === 'no' || NEGATIVE_PHRASES.some(p => lower.includes(p))) return 'no';
-  if (['partial', 'limited', 'basic', 'some ', 'expanding', 'primarily'].some(p => lower.includes(p))) return 'partial';
-  return 'yes';
+function toTitleCase(str) {
+  return str.replace(/\b([a-z])(\w*)/g, (_, first, rest) => first.toUpperCase() + rest);
 }
 
-/**
- * Explode list-like fields into one row per capability item.
- * Non-list fields are SKIPPED entirely — they are descriptive text, not capabilities.
- */
-function buildCapabilityRows(rows, productNames) {
+function cleanItem(raw) {
+  let s = raw.trim().replace(/[;.]+$/, '').trim();
+  if (s.length < 2) return null;
+  const lower = s.toLowerCase();
+  if (QUALIFIER_STARTS.some(q => lower.startsWith(q))) return null;
+  if (s.split(/\s+/).length > 5) return null;
+  return toTitleCase(s);
+}
+
+function buildFallbackRows(rows, productNames) {
   const result = [];
-
   for (const row of rows) {
-    const fieldName = row.Field;
     const allValues = productNames.map(p => row[p] || '');
-
     const isListField = allValues.some(v => {
-      const parts = v.split(',').map(s => s.trim()).filter(Boolean);
-      return (
-        parts.length >= 2 &&
-        parts.every(p => p.length <= 30) &&
-        !v.toLowerCase().includes('unconfirmed')
-      );
+      if (v.toLowerCase().includes('unconfirmed')) return false;
+      const parts = v.split(/[,;]/).map(s => s.trim()).filter(s => {
+        if (s.length < 2) return false;
+        return !QUALIFIER_STARTS.some(q => s.toLowerCase().startsWith(q));
+      });
+      return parts.length >= 2 && parts.every(p => p.length <= 40);
     });
-
-    // Skip non-list rows — they're descriptive text, not binary capabilities
     if (!isListField) continue;
 
-    // Collect unique items across all products (preserve insertion order)
-    const allItems = new Map(); // lowercase → display form
+    const allItems = new Map();
     allValues.forEach(v => {
       if (!v || v.toLowerCase().includes('unconfirmed')) return;
-      v.split(',').map(s => s.trim()).filter(Boolean).forEach(item => {
-        if (!allItems.has(item.toLowerCase())) allItems.set(item.toLowerCase(), item);
+      v.split(/[,;]/).forEach(raw => {
+        const c = cleanItem(raw);
+        if (c && !allItems.has(c.toLowerCase())) allItems.set(c.toLowerCase(), c);
       });
     });
 
     for (const [lcItem, displayItem] of allItems) {
-      const capRow = { Field: displayItem, _fieldGroup: fieldName };
+      const capRow = { Field: displayItem, _fieldGroup: row.Field };
       productNames.forEach(p => {
         const cell = row[p] || '';
         if (!cell || cell.toLowerCase().includes('unconfirmed')) {
-          capRow[p] = '';
+          capRow[p] = 'unknown';
         } else {
-          const items = cell.split(',').map(s => s.trim().toLowerCase());
-          capRow[p] = items.includes(lcItem) ? displayItem : 'No';
+          const cellItems = cell.split(/[,;]/).map(cleanItem).filter(Boolean);
+          capRow[p] = cellItems.some(i => i.toLowerCase() === lcItem) ? 'yes' : 'no';
         }
       });
       result.push(capRow);
     }
   }
-
   return result;
 }
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SupportMatrix({ data }) {
   const [tooltip, setTooltip] = useState(null);
@@ -78,13 +75,13 @@ export default function SupportMatrix({ data }) {
 
   const productNames = data.columns.slice(1);
 
-  const rawRows = data.support_matrix?.length > 0
-    ? data.support_matrix.map(e => ({ Field: e.capability, ...e }))
-    : data.rows;
+  // Prefer LLM-generated support_matrix (new analyses); fall back to parsed rows (old analyses)
+  const hasLLMMatrix = Array.isArray(data.support_matrix) && data.support_matrix.length > 0;
 
-  const rows = buildCapabilityRows(rawRows, productNames);
+  const rows = hasLLMMatrix
+    ? data.support_matrix.map(e => ({ Field: e.capability, _fieldGroup: null, ...e }))
+    : buildFallbackRows(data.rows, productNames);
 
-  // Empty state — no list-like rows found
   if (rows.length === 0) {
     return (
       <div className="py-12 text-center">
@@ -92,13 +89,13 @@ export default function SupportMatrix({ data }) {
           No feature-level capability data to compare for this analysis.
         </p>
         <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-          Switch to the <strong>Feature Comparison</strong> tab for a full view.
+          Re-run the analysis to get an AI-generated Support Matrix, or switch to{' '}
+          <strong>Feature Comparison</strong> for a full view.
         </p>
       </div>
     );
   }
 
-  // Track field group separators
   let lastGroup = null;
 
   return (
@@ -106,11 +103,9 @@ export default function SupportMatrix({ data }) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            {/* Capability column — sticky left */}
-            <th className="sticky top-0 left-0 z-30 px-3 py-2 text-left text-xs font-semibold border-b border-r-2 border-gray-200 dark:border-slate-700 min-w-44 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 whitespace-nowrap">
+            <th className="sticky top-0 left-0 z-30 px-3 py-2 text-left text-xs font-semibold border-b border-r-2 border-gray-200 dark:border-slate-700 min-w-48 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 whitespace-nowrap">
               Capability
             </th>
-            {/* Product columns */}
             {productNames.map(name => (
               <th
                 key={name}
@@ -123,7 +118,7 @@ export default function SupportMatrix({ data }) {
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => {
-            const showGroupHeader = row._fieldGroup && row._fieldGroup !== lastGroup;
+            const showGroupHeader = !hasLLMMatrix && row._fieldGroup && row._fieldGroup !== lastGroup;
             if (showGroupHeader) lastGroup = row._fieldGroup;
 
             return (
@@ -139,16 +134,12 @@ export default function SupportMatrix({ data }) {
                   </tr>
                 )}
                 <tr className="border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                  {/* Capability name — sticky left */}
                   <td className="sticky left-0 px-3 py-2 bg-white dark:bg-slate-900 border-r-2 border-gray-200 dark:border-slate-700 text-xs font-medium text-gray-700 dark:text-slate-300 z-10">
                     {row.Field}
                   </td>
-                  {/* Product icon cells */}
                   {productNames.map(name => {
-                    const rawValue = row[name] || '';
-                    const status = data.support_matrix?.length > 0
-                      ? (['yes','partial','no'].includes(rawValue.toLowerCase()) ? rawValue.toLowerCase() : 'unknown')
-                      : (rawValue === 'No' ? 'no' : classifyCell(rawValue));
+                    const rawValue = (row[name] || '').toLowerCase().trim();
+                    const status = ['yes', 'partial', 'no'].includes(rawValue) ? rawValue : 'unknown';
                     const icon = ICONS[status];
                     const isActive = tooltip?.rowIndex === rowIndex && tooltip?.colName === name;
 
@@ -157,7 +148,7 @@ export default function SupportMatrix({ data }) {
                         <div className="relative group inline-block">
                           <button
                             className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto text-sm font-bold transition-opacity cursor-pointer ${icon.classes} ${isActive ? 'ring-2 ring-sky-400' : 'hover:opacity-80'}`}
-                            onClick={() => setTooltip(isActive ? null : { rowIndex, colName: name, value: rawValue || '—', field: row.Field })}
+                            onClick={() => setTooltip(isActive ? null : { rowIndex, colName: name, status, field: row.Field })}
                           >
                             {icon.symbol}
                           </button>
@@ -168,7 +159,7 @@ export default function SupportMatrix({ data }) {
                                 status === 'partial' ? 'text-yellow-400' :
                                 status === 'no' ? 'text-red-400' : 'text-gray-400'
                               }`}>{icon.symbol} {icon.label}</p>
-                              <p className="text-gray-300 leading-relaxed break-words">{rawValue || '—'}</p>
+                              <p className="text-gray-300 leading-relaxed">{row.Field}</p>
                             </div>
                             <div className="w-2 h-2 bg-gray-900 dark:bg-slate-700 rotate-45 mx-auto -mt-1" />
                           </div>
@@ -184,9 +175,21 @@ export default function SupportMatrix({ data }) {
       </table>
 
       {tooltip && (
-        <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs text-gray-700 dark:text-slate-300 max-w-xl">
-          <p className="font-semibold text-gray-900 dark:text-white mb-1">{tooltip.field} — {tooltip.colName}</p>
-          <p className="leading-relaxed">{tooltip.value}</p>
+        <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs max-w-xl flex items-start gap-3">
+          <span className={`text-lg font-bold shrink-0 ${
+            tooltip.status === 'yes' ? 'text-green-500' :
+            tooltip.status === 'partial' ? 'text-yellow-500' :
+            tooltip.status === 'no' ? 'text-red-500' : 'text-gray-400'
+          }`}>{ICONS[tooltip.status].symbol}</span>
+          <div>
+            <p className="font-semibold text-gray-900 dark:text-white">{tooltip.field}</p>
+            <p className="text-gray-500 dark:text-slate-400 mt-0.5">
+              {tooltip.status === 'yes' && <><strong className="text-gray-700 dark:text-slate-200">{tooltip.colName}</strong> supports this capability.</>}
+              {tooltip.status === 'partial' && <><strong className="text-gray-700 dark:text-slate-200">{tooltip.colName}</strong> has partial or limited support.</>}
+              {tooltip.status === 'no' && <><strong className="text-gray-700 dark:text-slate-200">{tooltip.colName}</strong> does not support this capability.</>}
+              {tooltip.status === 'unknown' && <>Support status for <strong className="text-gray-700 dark:text-slate-200">{tooltip.colName}</strong> is unconfirmed.</>}
+            </p>
+          </div>
         </div>
       )}
 
